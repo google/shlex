@@ -64,8 +64,8 @@ const (
 	RUNE_SPACE             string = " \t\r\n"
 	RUNE_ESCAPING_QUOTE    string = "\""
 	RUNE_NONESCAPING_QUOTE string = "'"
-	RUNE_ESCAPE            = "\\"
-	RUNE_COMMENT           = "#"
+	RUNE_ESCAPE                   = "\\"
+	RUNE_COMMENT                  = "#"
 
 	RUNETOKEN_UNKNOWN           RuneTokenType = 0
 	RUNETOKEN_CHAR              RuneTokenType = 1
