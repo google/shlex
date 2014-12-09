@@ -17,12 +17,11 @@ limitations under the License.
 package shlex
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
 
-func checkError(err os.Error, t *testing.T) {
+func checkError(err error, t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
@@ -30,7 +29,7 @@ func checkError(err os.Error, t *testing.T) {
 
 func TestClassifier(t *testing.T) {
 	classifier := NewDefaultClassifier()
-	runeTests := map[int]RuneTokenType{
+	runeTests := map[rune]RuneTokenType{
 		'a':  RUNETOKEN_CHAR,
 		' ':  RUNETOKEN_SPACE,
 		'"':  RUNETOKEN_ESCAPING_QUOTE,

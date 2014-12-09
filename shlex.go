@@ -24,7 +24,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 )
 
@@ -98,10 +97,10 @@ classifiers - those accepting extended non-ascii chars, or strict posix
 compatibility, for example.
 */
 type TokenClassifier struct {
-	typeMap map[int]RuneTokenType
+	typeMap map[rune]RuneTokenType
 }
 
-func addRuneClass(typeMap *map[int]RuneTokenType, runes string, tokenType RuneTokenType) {
+func addRuneClass(typeMap *map[rune]RuneTokenType, runes string, tokenType RuneTokenType) {
 	for _, rune := range runes {
 		(*typeMap)[rune] = tokenType
 	}
@@ -111,7 +110,7 @@ func addRuneClass(typeMap *map[int]RuneTokenType, runes string, tokenType RuneTo
 Create a new classifier for basic ASCII characters.
 */
 func NewDefaultClassifier() *TokenClassifier {
-	typeMap := map[int]RuneTokenType{}
+	typeMap := map[rune]RuneTokenType{}
 	addRuneClass(&typeMap, RUNE_CHAR, RUNETOKEN_CHAR)
 	addRuneClass(&typeMap, RUNE_SPACE, RUNETOKEN_SPACE)
 	addRuneClass(&typeMap, RUNE_ESCAPING_QUOTE, RUNETOKEN_ESCAPING_QUOTE)
@@ -122,8 +121,8 @@ func NewDefaultClassifier() *TokenClassifier {
 		typeMap: typeMap}
 }
 
-func (classifier *TokenClassifier) ClassifyRune(rune int) RuneTokenType {
-	return classifier.typeMap[rune]
+func (classifier *TokenClassifier) ClassifyRune(runeVal rune) RuneTokenType {
+	return classifier.typeMap[runeVal]
 }
 
 /*
@@ -137,7 +136,7 @@ type Lexer struct {
 /*
 Create a new lexer.
 */
-func NewLexer(r io.Reader) (*Lexer, os.Error) {
+func NewLexer(r io.Reader) (*Lexer, error) {
 
 	tokenizer, err := NewTokenizer(r)
 	if err != nil {
@@ -149,11 +148,11 @@ func NewLexer(r io.Reader) (*Lexer, os.Error) {
 
 /*
 Return the next word, and an error value. If there are no more words, the error
-will be os.EOF.
+will be io.EOF.
 */
-func (l *Lexer) NextWord() (string, os.Error) {
+func (l *Lexer) NextWord() (string, error) {
 	var token *Token
-	var err os.Error
+	var err error
 	for {
 		token, err = l.tokenizer.NextToken()
 		if err != nil {
@@ -174,7 +173,7 @@ func (l *Lexer) NextWord() (string, os.Error) {
 			}
 		}
 	}
-	return "", os.EOF
+	return "", io.EOF
 }
 
 /*
@@ -188,7 +187,7 @@ type Tokenizer struct {
 /*
 Create a new tokenizer.
 */
-func NewTokenizer(r io.Reader) (*Tokenizer, os.Error) {
+func NewTokenizer(r io.Reader) (*Tokenizer, error) {
 	input := bufio.NewReader(r)
 	classifier := NewDefaultClassifier()
 	tokenizer := &Tokenizer{
@@ -203,21 +202,21 @@ Scan the stream for the next token.
 This uses an internal state machine. It will panic if it encounters a character
 which it does not know how to handle.
 */
-func (t *Tokenizer) scanStream() (*Token, os.Error) {
+func (t *Tokenizer) scanStream() (*Token, error) {
 	state := STATE_START
 	var tokenType TokenType
-	value := make([]int, 0, INITIAL_TOKEN_CAPACITY)
+	value := make([]rune, 0, INITIAL_TOKEN_CAPACITY)
 	var (
-		nextRune     int
+		nextRune     rune
 		nextRuneType RuneTokenType
-		err          os.Error
+		err          error
 	)
 SCAN:
 	for {
 		nextRune, _, err = t.input.ReadRune()
 		nextRuneType = t.classifier.ClassifyRune(nextRune)
 		if err != nil {
-			if err == os.EOF {
+			if err == io.EOF {
 				nextRuneType = RUNETOKEN_EOF
 				err = nil
 			} else {
@@ -230,7 +229,7 @@ SCAN:
 				switch nextRuneType {
 				case RUNETOKEN_EOF:
 					{
-						return nil, os.EOF
+						return nil, io.EOF
 					}
 				case RUNETOKEN_CHAR:
 					{
@@ -263,7 +262,7 @@ SCAN:
 					}
 				default:
 					{
-						return nil, os.NewError(fmt.Sprintf("Uknown rune: %v", nextRune))
+						return nil, fmt.Errorf("Uknown rune: %v", nextRune)
 					}
 				}
 			}
@@ -297,7 +296,7 @@ SCAN:
 					}
 				default:
 					{
-						return nil, os.NewError(fmt.Sprintf("Uknown rune: %v", nextRune))
+						return nil, fmt.Errorf("Uknown rune: %v", nextRune)
 					}
 				}
 			}
@@ -306,7 +305,7 @@ SCAN:
 				switch nextRuneType {
 				case RUNETOKEN_EOF:
 					{
-						err = os.NewError("EOF found after escape character")
+						err = fmt.Errorf("EOF found after escape character")
 						break SCAN
 					}
 				case RUNETOKEN_CHAR, RUNETOKEN_SPACE, RUNETOKEN_ESCAPING_QUOTE, RUNETOKEN_NONESCAPING_QUOTE, RUNETOKEN_ESCAPE, RUNETOKEN_COMMENT:
@@ -316,7 +315,7 @@ SCAN:
 					}
 				default:
 					{
-						return nil, os.NewError(fmt.Sprintf("Uknown rune: %v", nextRune))
+						return nil, fmt.Errorf("Uknown rune: %v", nextRune)
 					}
 				}
 			}
@@ -325,7 +324,7 @@ SCAN:
 				switch nextRuneType {
 				case RUNETOKEN_EOF:
 					{
-						err = os.NewError("EOF found after escape character")
+						err = fmt.Errorf("EOF found after escape character")
 						break SCAN
 					}
 				case RUNETOKEN_CHAR, RUNETOKEN_SPACE, RUNETOKEN_ESCAPING_QUOTE, RUNETOKEN_NONESCAPING_QUOTE, RUNETOKEN_ESCAPE, RUNETOKEN_COMMENT:
@@ -335,7 +334,7 @@ SCAN:
 					}
 				default:
 					{
-						return nil, os.NewError(fmt.Sprintf("Uknown rune: %v", nextRune))
+						return nil, fmt.Errorf("Uknown rune: %v", nextRune)
 					}
 				}
 			}
@@ -344,7 +343,7 @@ SCAN:
 				switch nextRuneType {
 				case RUNETOKEN_EOF:
 					{
-						err = os.NewError("EOF found when expecting closing quote.")
+						err = fmt.Errorf("EOF found when expecting closing quote.")
 						break SCAN
 					}
 				case RUNETOKEN_CHAR, RUNETOKEN_SPACE, RUNETOKEN_NONESCAPING_QUOTE, RUNETOKEN_COMMENT:
@@ -361,7 +360,7 @@ SCAN:
 					}
 				default:
 					{
-						return nil, os.NewError(fmt.Sprintf("Uknown rune: %v", nextRune))
+						return nil, fmt.Errorf("Uknown rune: %v", nextRune)
 					}
 				}
 			}
@@ -370,7 +369,7 @@ SCAN:
 				switch nextRuneType {
 				case RUNETOKEN_EOF:
 					{
-						err = os.NewError("EOF found when expecting closing quote.")
+						err = fmt.Errorf("EOF found when expecting closing quote.")
 						break SCAN
 					}
 				case RUNETOKEN_CHAR, RUNETOKEN_SPACE, RUNETOKEN_ESCAPING_QUOTE, RUNETOKEN_ESCAPE, RUNETOKEN_COMMENT:
@@ -383,7 +382,7 @@ SCAN:
 					}
 				default:
 					{
-						return nil, os.NewError(fmt.Sprintf("Uknown rune: %v", nextRune))
+						return nil, fmt.Errorf("Uknown rune: %v", nextRune)
 					}
 				}
 			}
@@ -409,7 +408,7 @@ SCAN:
 					}
 				default:
 					{
-						return nil, os.NewError(fmt.Sprintf("Uknown rune: %v", nextRune))
+						return nil, fmt.Errorf("Uknown rune: %v", nextRune)
 					}
 				}
 			}
@@ -427,9 +426,9 @@ SCAN:
 
 /*
 Return the next token in the stream, and an error value. If there are no more
-tokens available, the error value will be os.EOF.
+tokens available, the error value will be io.EOF.
 */
-func (t *Tokenizer) NextToken() (*Token, os.Error) {
+func (t *Tokenizer) NextToken() (*Token, error) {
 	return t.scanStream()
 }
 
@@ -437,7 +436,7 @@ func (t *Tokenizer) NextToken() (*Token, os.Error) {
 Split a string in to a slice of strings, based upon shell-style rules for
 quoting, escaping, and spaces.
 */
-func Split(s string) ([]string, os.Error) {
+func Split(s string) ([]string, error) {
 	l, err := NewLexer(strings.NewReader(s))
 	if err != nil {
 		return nil, err
@@ -446,7 +445,7 @@ func Split(s string) ([]string, os.Error) {
 	for {
 		word, err := l.NextWord()
 		if err != nil {
-			if err == os.EOF {
+			if err == io.EOF {
 				return subStrings, nil
 			}
 			return subStrings, err
