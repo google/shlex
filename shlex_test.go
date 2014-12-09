@@ -82,9 +82,8 @@ func TestTokenizer(t *testing.T) {
 func TestLexer(t *testing.T) {
 	testInput := strings.NewReader("one")
 	expectedWord := "one"
-	lexer, err := NewLexer(testInput)
-	checkError(err, t)
-	foundWord, err := lexer.NextWord()
+	lexer := NewLexer(testInput)
+	foundWord, err := lexer.Next()
 	checkError(err, t)
 	if expectedWord != foundWord {
 		t.Error("Expected word:", expectedWord, ". Found:", foundWord)

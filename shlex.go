@@ -20,9 +20,16 @@ package shlex
 Package shlex implements a simple lexer which splits input in to tokens using
 shell-style rules for quoting and commenting.
 
-TODO: document examples:
+The basic use case uses the default ASCII lexer to split a string into sub-strings:
 
-Alternative classifiers.
+shlex.Split("one \"two three\" four") -> []string{"one", "two three", "four"}
+
+To process a stream of tokens:
+
+l := NewLexer(os.Stdin)
+for token, err := l.Next(); err != nil {
+	// process token
+}
 */
 import (
 	"bufio"
@@ -138,16 +145,16 @@ type Lexer struct {
 }
 
 // NewLexer creates a new lexer from an input stream.
-func NewLexer(r io.Reader) (*Lexer, error) {
+func NewLexer(r io.Reader) *Lexer {
 
 	tokenizer := NewTokenizer(r)
 	lexer := &Lexer{tokenizer: tokenizer}
-	return lexer, nil
+	return lexer
 }
 
-// NextWords returns the next word, or an error. If there are no more words,
+// Next returns the next word, or an error. If there are no more words,
 // the error will be io.EOF.
-func (l *Lexer) NextWord() (string, error) {
+func (l *Lexer) Next() (string, error) {
 	var token *Token
 	var err error
 	for {
@@ -420,15 +427,11 @@ func (t *Tokenizer) NextToken() (*Token, error) {
 }
 
 // Split partitions a string into a slice of strings.
-
 func Split(s string) ([]string, error) {
-	l, err := NewLexer(strings.NewReader(s))
-	if err != nil {
-		return nil, err
-	}
+	l := NewLexer(strings.NewReader(s))
 	subStrings := make([]string, 0)
 	for {
-		word, err := l.NextWord()
+		word, err := l.Next()
 		if err != nil {
 			if err == io.EOF {
 				return subStrings, nil
