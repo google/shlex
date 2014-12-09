@@ -69,8 +69,7 @@ func TestTokenizer(t *testing.T) {
 			tokenType: TOKEN_WORD,
 			value:     "eleven"}}
 
-	tokenizer, err := NewTokenizer(testInput)
-	checkError(err, t)
+	tokenizer := NewTokenizer(testInput)
 	for _, expectedToken := range expectedTokens {
 		foundToken, err := tokenizer.NextToken()
 		checkError(err, t)

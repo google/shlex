@@ -19,6 +19,10 @@ package shlex
 /*
 Package shlex implements a simple lexer which splits input in to tokens using
 shell-style rules for quoting and commenting.
+
+TODO: document examples:
+
+Alternative classifiers.
 */
 import (
 	"bufio"
@@ -27,27 +31,23 @@ import (
 	"strings"
 )
 
-/*
-A TokenType is a top-level token; a word, space, comment, unknown.
-*/
+// TokenType is a top-level token classification: A word, space, comment, unknown.
 type TokenType int
 
-/*
-A RuneTokenType is the type of a UTF-8 character; a character, quote, space, escape.
-*/
+// RuneTokenType is the type of a UTF-8 character classification: A character, quote, space, escape.
 type RuneTokenType int
 
 type lexerState int
 
+// Token is a (type, value) pair representing a lexographical token.
 type Token struct {
 	tokenType TokenType
 	value     string
 }
 
-/*
-Two tokens are equal if both their types and values are equal. A nil token can
-never equal another token.
-*/
+// Equal reports whether tokens a, and b, are equal.
+// Two tokens are equal if both their types and values are equal. A nil token can
+// never be equal to another token.
 func (a *Token) Equal(b *Token) bool {
 	if a == nil || b == nil {
 		return false
@@ -58,44 +58,52 @@ func (a *Token) Equal(b *Token) bool {
 	return a.value == b.value
 }
 
+// Named sets of UTF-8 runes
 const (
-	RUNE_CHAR              string = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-,"
-	RUNE_SPACE             string = " \t\r\n"
-	RUNE_ESCAPING_QUOTE    string = "\""
-	RUNE_NONESCAPING_QUOTE string = "'"
-	RUNE_ESCAPE                   = "\\"
-	RUNE_COMMENT                  = "#"
+	RUNE_CHAR              = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-,"
+	RUNE_SPACE             = " \t\r\n"
+	RUNE_ESCAPING_QUOTE    = "\""
+	RUNE_NONESCAPING_QUOTE = "'"
+	RUNE_ESCAPE            = "\\"
+	RUNE_COMMENT           = "#"
+)
 
-	RUNETOKEN_UNKNOWN           RuneTokenType = 0
-	RUNETOKEN_CHAR              RuneTokenType = 1
-	RUNETOKEN_SPACE             RuneTokenType = 2
-	RUNETOKEN_ESCAPING_QUOTE    RuneTokenType = 3
-	RUNETOKEN_NONESCAPING_QUOTE RuneTokenType = 4
-	RUNETOKEN_ESCAPE            RuneTokenType = 5
-	RUNETOKEN_COMMENT           RuneTokenType = 6
-	RUNETOKEN_EOF               RuneTokenType = 7
+// Classes of rune token
+const (
+	RUNETOKEN_UNKNOWN           RuneTokenType = iota
+	RUNETOKEN_CHAR              RuneTokenType = iota
+	RUNETOKEN_SPACE             RuneTokenType = iota
+	RUNETOKEN_ESCAPING_QUOTE    RuneTokenType = iota
+	RUNETOKEN_NONESCAPING_QUOTE RuneTokenType = iota
+	RUNETOKEN_ESCAPE            RuneTokenType = iota
+	RUNETOKEN_COMMENT           RuneTokenType = iota
+	RUNETOKEN_EOF               RuneTokenType = iota
+)
 
-	TOKEN_UNKNOWN TokenType = 0
-	TOKEN_WORD    TokenType = 1
-	TOKEN_SPACE   TokenType = 2
-	TOKEN_COMMENT TokenType = 3
+// Classes of lexographic token
+const (
+	TOKEN_UNKNOWN TokenType = iota
+	TOKEN_WORD    TokenType = iota
+	TOKEN_SPACE   TokenType = iota
+	TOKEN_COMMENT TokenType = iota
+)
 
-	STATE_START           lexerState = 0
-	STATE_INWORD          lexerState = 1
-	STATE_ESCAPING        lexerState = 2
-	STATE_ESCAPING_QUOTED lexerState = 3
-	STATE_QUOTED_ESCAPING lexerState = 4
-	STATE_QUOTED          lexerState = 5
-	STATE_COMMENT         lexerState = 6
+// Lexer state machine states
+const (
+	STATE_START           lexerState = iota
+	STATE_INWORD          lexerState = iota
+	STATE_ESCAPING        lexerState = iota
+	STATE_ESCAPING_QUOTED lexerState = iota
+	STATE_QUOTED_ESCAPING lexerState = iota
+	STATE_QUOTED          lexerState = iota
+	STATE_COMMENT         lexerState = iota
+)
 
+const (
 	INITIAL_TOKEN_CAPACITY int = 100
 )
 
-/*
-A type for classifying characters. This allows for different sorts of
-classifiers - those accepting extended non-ascii chars, or strict posix
-compatibility, for example.
-*/
+// TokenClassifier is used for classifying rune characters
 type TokenClassifier struct {
 	typeMap map[rune]RuneTokenType
 }
@@ -106,9 +114,7 @@ func addRuneClass(typeMap *map[rune]RuneTokenType, runes string, tokenType RuneT
 	}
 }
 
-/*
-Create a new classifier for basic ASCII characters.
-*/
+// NewDefaultClassifier creates a new classifier for ASCII characters.
 func NewDefaultClassifier() *TokenClassifier {
 	typeMap := map[rune]RuneTokenType{}
 	addRuneClass(&typeMap, RUNE_CHAR, RUNETOKEN_CHAR)
@@ -121,35 +127,26 @@ func NewDefaultClassifier() *TokenClassifier {
 		typeMap: typeMap}
 }
 
+// ClassifyRune classifiees a rune
 func (classifier *TokenClassifier) ClassifyRune(runeVal rune) RuneTokenType {
 	return classifier.typeMap[runeVal]
 }
 
-/*
-A type for turning an input stream in to a sequence of strings. Whitespace and
-comments are skipped.
-*/
+// Lexer turns an input stream into a sequence of tokens. Whitespace and comments are skipped.
 type Lexer struct {
 	tokenizer *Tokenizer
 }
 
-/*
-Create a new lexer.
-*/
+// NewLexer creates a new lexer from an input stream.
 func NewLexer(r io.Reader) (*Lexer, error) {
 
-	tokenizer, err := NewTokenizer(r)
-	if err != nil {
-		return nil, err
-	}
+	tokenizer := NewTokenizer(r)
 	lexer := &Lexer{tokenizer: tokenizer}
 	return lexer, nil
 }
 
-/*
-Return the next word, and an error value. If there are no more words, the error
-will be io.EOF.
-*/
+// NextWords returns the next word, or an error. If there are no more words,
+// the error will be io.EOF.
 func (l *Lexer) NextWord() (string, error) {
 	var token *Token
 	var err error
@@ -169,39 +166,32 @@ func (l *Lexer) NextWord() (string, error) {
 			}
 		default:
 			{
-				panic(fmt.Sprintf("Unknown token type: %v", token.tokenType))
+				return "", fmt.Errorf("Unknown token type: %v", token.tokenType)
 			}
 		}
 	}
 	return "", io.EOF
 }
 
-/*
-A type for turning an input stream in to a sequence of typed tokens.
-*/
+// Tokenizer turns an input stream into a sequence of typed tokens
 type Tokenizer struct {
 	input      *bufio.Reader
 	classifier *TokenClassifier
 }
 
-/*
-Create a new tokenizer.
-*/
-func NewTokenizer(r io.Reader) (*Tokenizer, error) {
+// NewTokenizer creates a new tokenizer from an input stream.
+func NewTokenizer(r io.Reader) *Tokenizer {
 	input := bufio.NewReader(r)
 	classifier := NewDefaultClassifier()
 	tokenizer := &Tokenizer{
 		input:      input,
 		classifier: classifier}
-	return tokenizer, nil
+	return tokenizer
 }
 
-/*
-Scan the stream for the next token.
-
-This uses an internal state machine. It will panic if it encounters a character
-which it does not know how to handle.
-*/
+// scanStream scans the stream for the next token using the internal state machine.
+// It will panic if it encounters a rune which it does not know how to handle.
+// TODO: do not panic.
 func (t *Tokenizer) scanStream() (*Token, error) {
 	state := STATE_START
 	var tokenType TokenType
@@ -300,7 +290,7 @@ SCAN:
 					}
 				}
 			}
-		case STATE_ESCAPING: // the next rune after an escape character
+		case STATE_ESCAPING: // the rune after an escape character
 			{
 				switch nextRuneType {
 				case RUNETOKEN_EOF:
@@ -343,7 +333,7 @@ SCAN:
 				switch nextRuneType {
 				case RUNETOKEN_EOF:
 					{
-						err = fmt.Errorf("EOF found when expecting closing quote.")
+						err = fmt.Errorf("EOF found when expecting closing quote")
 						break SCAN
 					}
 				case RUNETOKEN_CHAR, RUNETOKEN_SPACE, RUNETOKEN_NONESCAPING_QUOTE, RUNETOKEN_COMMENT:
@@ -369,7 +359,7 @@ SCAN:
 				switch nextRuneType {
 				case RUNETOKEN_EOF:
 					{
-						err = fmt.Errorf("EOF found when expecting closing quote.")
+						err = fmt.Errorf("EOF found when expecting closing quote")
 						break SCAN
 					}
 				case RUNETOKEN_CHAR, RUNETOKEN_SPACE, RUNETOKEN_ESCAPING_QUOTE, RUNETOKEN_ESCAPE, RUNETOKEN_COMMENT:
@@ -424,24 +414,19 @@ SCAN:
 	return token, err
 }
 
-/*
-Return the next token in the stream, and an error value. If there are no more
-tokens available, the error value will be io.EOF.
-*/
+// NextToken returns the next token in the stream.
 func (t *Tokenizer) NextToken() (*Token, error) {
 	return t.scanStream()
 }
 
-/*
-Split a string in to a slice of strings, based upon shell-style rules for
-quoting, escaping, and spaces.
-*/
+// Split partitions a string into a slice of strings.
+
 func Split(s string) ([]string, error) {
 	l, err := NewLexer(strings.NewReader(s))
 	if err != nil {
 		return nil, err
 	}
-	subStrings := []string{}
+	subStrings := make([]string, 0)
 	for {
 		word, err := l.NextWord()
 		if err != nil {
