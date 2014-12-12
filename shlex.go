@@ -14,31 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package shlex
-
 /*
 Package shlex implements a simple lexer which splits input in to tokens using
 shell-style rules for quoting and commenting.
 
 The basic use case uses the default ASCII lexer to split a string into sub-strings:
 
-shlex.Split("one \"two three\" four") -> []string{"one", "two three", "four"}
+  shlex.Split("one \"two three\" four") -> []string{"one", "two three", "four"}
 
 To process a stream of strings:
 
-l := NewLexer(os.Stdin)
-for token, err := l.Next(); err != nil {
-	// process token
-}
+  l := NewLexer(os.Stdin)
+  for ; token, err := l.Next(); err != nil {
+  	// process token
+  }
 
 To access the raw token stream (which includes tokens for comments):
 
-t := NewTokenizer(os.Stdin)
-for token, err := t.Next(); err != nil {
+  t := NewTokenizer(os.Stdin)
+  for ; token, err := t.Next(); err != nil {
 	// process token
-}
+  }
 
 */
+package shlex
+
 import (
 	"bufio"
 	"fmt"
@@ -78,141 +78,109 @@ func (a *Token) Equal(b *Token) bool {
 const (
 	charRunes             = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-,|"
 	spaceRunes            = " \t\r\n"
-	escapingQuoteRunes    = "\""
+	escapingQuoteRunes    = `"`
 	nonEscapingQuoteRunes = "'"
-	escapeRunes           = "\\"
+	escapeRunes           = `\`
 	commentRunes          = "#"
 )
 
 // Classes of rune token
 const (
-	unknownRuneClass          runeTokenClass = iota
-	charRuneClass             runeTokenClass = iota
-	spaceRuneClass            runeTokenClass = iota
-	escapingQuoteRuneClass    runeTokenClass = iota
-	nonEscapingQuoteRuneClass runeTokenClass = iota
-	escapeRuneClass           runeTokenClass = iota
-	commentRuneClass          runeTokenClass = iota
-	eofRuneClass              runeTokenClass = iota
+	unknownRuneClass runeTokenClass = iota
+	charRuneClass
+	spaceRuneClass
+	escapingQuoteRuneClass
+	nonEscapingQuoteRuneClass
+	escapeRuneClass
+	commentRuneClass
+	eofRuneClass
 )
 
 // Classes of lexographic token
 const (
 	UnknownToken TokenType = iota
-	WordToken    TokenType = iota
-	SpaceToken   TokenType = iota
-	CommentToken TokenType = iota
+	WordToken
+	SpaceToken
+	CommentToken
 )
 
 // Lexer state machine states
 const (
-	// startState - no runes have been seen
-	startState lexerState = iota
-
-	// inWordState - processing regular runes in a word
-	inWordState lexerState = iota
-
-	// escapingState - we have just consumed an escape rune; the next rune is literal
-	escapingState lexerState = iota
-
-	// escapingQuotedState - we have just consumed an escape rune within a quoted string
-	escapingQuotedState lexerState = iota
-
-	// quotingEscapingState - we are within a quoted string that supports escaping ("...")
-	quotingEscapingState lexerState = iota
-
-	// quotingState - we are within a string that does not support escaping ('...')
-	quotingState lexerState = iota
-
-	// commentState - we are within a comment (everything following an unquoted or unescaped #
-	commentState lexerState = iota
+	startState           lexerState = iota // no runes have been seen
+	inWordState                            // processing regular runes in a word
+	escapingState                          // we have just consumed an escape rune; the next rune is literal
+	escapingQuotedState                    // we have just consumed an escape rune within a quoted string
+	quotingEscapingState                   // we are within a quoted string that supports escaping ("...")
+	quotingState                           // we are within a string that does not support escaping ('...')
+	commentState                           // we are within a comment (everything following an unquoted or unescaped #
 )
 
-const (
-	initialTokenCapacity int = 100
-)
+// tokenClassifier is used for classifying rune characters.
+type tokenClassifier map[rune]runeTokenClass
 
-// tokenClassifier is used for classifying rune characters
-type tokenClassifier struct {
-	typeMap map[rune]runeTokenClass
-}
-
-func addRuneClass(typeMap *map[rune]runeTokenClass, runes string, tokenType runeTokenClass) {
+func (typeMap tokenClassifier) addRuneClass(runes string, tokenType runeTokenClass) {
 	for _, runeChar := range runes {
-		(*typeMap)[runeChar] = tokenType
+		typeMap[runeChar] = tokenType
 	}
 }
 
-// NewDefaultClassifier creates a new classifier for ASCII characters.
-func NewDefaultClassifier() *tokenClassifier {
-	typeMap := map[rune]runeTokenClass{}
-	addRuneClass(&typeMap, charRunes, charRuneClass)
-	addRuneClass(&typeMap, spaceRunes, spaceRuneClass)
-	addRuneClass(&typeMap, escapingQuoteRunes, escapingQuoteRuneClass)
-	addRuneClass(&typeMap, nonEscapingQuoteRunes, nonEscapingQuoteRuneClass)
-	addRuneClass(&typeMap, escapeRunes, escapeRuneClass)
-	addRuneClass(&typeMap, commentRunes, commentRuneClass)
-	return &tokenClassifier{
-		typeMap: typeMap}
+// newDefaultClassifier creates a new classifier for ASCII characters.
+func newDefaultClassifier() tokenClassifier {
+	t := tokenClassifier{}
+	t.addRuneClass(charRunes, charRuneClass)
+	t.addRuneClass(spaceRunes, spaceRuneClass)
+	t.addRuneClass(escapingQuoteRunes, escapingQuoteRuneClass)
+	t.addRuneClass(nonEscapingQuoteRunes, nonEscapingQuoteRuneClass)
+	t.addRuneClass(escapeRunes, escapeRuneClass)
+	t.addRuneClass(commentRunes, commentRuneClass)
+	return t
 }
 
 // ClassifyRune classifiees a rune
-func (classifier *tokenClassifier) ClassifyRune(runeVal rune) runeTokenClass {
-	return classifier.typeMap[runeVal]
+func (t tokenClassifier) ClassifyRune(runeVal rune) runeTokenClass {
+	return t[runeVal]
 }
 
 // Lexer turns an input stream into a sequence of tokens. Whitespace and comments are skipped.
-type Lexer struct {
-	tokenizer *Tokenizer
-}
+type Lexer Tokenizer
 
 // NewLexer creates a new lexer from an input stream.
 func NewLexer(r io.Reader) *Lexer {
 
-	tokenizer := NewTokenizer(r)
-	return &Lexer{tokenizer: tokenizer}
+	return (*Lexer)(NewTokenizer(r))
 }
 
 // Next returns the next word, or an error. If there are no more words,
 // the error will be io.EOF.
 func (l *Lexer) Next() (string, error) {
-	var token *Token
-	var err error
 	for {
-		token, err = l.tokenizer.Next()
+		token, err := (*Tokenizer)(l).Next()
 		if err != nil {
 			return "", err
 		}
 		switch token.tokenType {
 		case WordToken:
-			{
-				return token.value, nil
-			}
+			return token.value, nil
 		case CommentToken:
-			{
-				// skip comments
-			}
+			// skip comments
 		default:
-			{
-				return "", fmt.Errorf("Unknown token type: %v", token.tokenType)
-			}
+			return "", fmt.Errorf("Unknown token type: %v", token.tokenType)
 		}
 	}
-	return "", io.EOF
 }
 
 // Tokenizer turns an input stream into a sequence of typed tokens
 type Tokenizer struct {
-	input      *bufio.Reader
-	classifier *tokenClassifier
+	input      bufio.Reader
+	classifier tokenClassifier
 }
 
 // NewTokenizer creates a new tokenizer from an input stream.
 func NewTokenizer(r io.Reader) *Tokenizer {
 	input := bufio.NewReader(r)
-	classifier := NewDefaultClassifier()
+	classifier := newDefaultClassifier()
 	return &Tokenizer{
-		input:      input,
+		input:      *input,
 		classifier: classifier}
 }
 
@@ -221,24 +189,22 @@ func NewTokenizer(r io.Reader) *Tokenizer {
 func (t *Tokenizer) scanStream() (*Token, error) {
 	state := startState
 	var tokenType TokenType
-	value := make([]rune, 0, initialTokenCapacity)
-	var (
-		nextRune     rune
-		nextRuneType runeTokenClass
-		err          error
-	)
-SCAN:
+	var value []rune
+	var nextRune rune
+	var nextRuneType runeTokenClass
+	var err error
+
 	for {
 		nextRune, _, err = t.input.ReadRune()
 		nextRuneType = t.classifier.ClassifyRune(nextRune)
-		if err != nil {
-			if err == io.EOF {
-				nextRuneType = eofRuneClass
-				err = nil
-			} else {
-				return nil, err
-			}
+
+		if err == io.EOF {
+			nextRuneType = eofRuneClass
+			err = nil
+		} else if err != nil {
+			return nil, err
 		}
+
 		switch state {
 		case startState: // no runes read yet
 			{
@@ -287,7 +253,10 @@ SCAN:
 				switch nextRuneType {
 				case eofRuneClass:
 					{
-						break SCAN
+						token := &Token{
+							tokenType: tokenType,
+							value:     string(value)}
+						return token, err
 					}
 				case charRuneClass, commentRuneClass:
 					{
@@ -296,7 +265,10 @@ SCAN:
 				case spaceRuneClass:
 					{
 						t.input.UnreadRune()
-						break SCAN
+						token := &Token{
+							tokenType: tokenType,
+							value:     string(value)}
+						return token, err
 					}
 				case escapingQuoteRuneClass:
 					{
@@ -322,7 +294,10 @@ SCAN:
 				case eofRuneClass:
 					{
 						err = fmt.Errorf("EOF found after escape character")
-						break SCAN
+						token := &Token{
+							tokenType: tokenType,
+							value:     string(value)}
+						return token, err
 					}
 				case charRuneClass, spaceRuneClass, escapingQuoteRuneClass, nonEscapingQuoteRuneClass, escapeRuneClass, commentRuneClass:
 					{
@@ -341,7 +316,10 @@ SCAN:
 				case eofRuneClass:
 					{
 						err = fmt.Errorf("EOF found after escape character")
-						break SCAN
+						token := &Token{
+							tokenType: tokenType,
+							value:     string(value)}
+						return token, err
 					}
 				case charRuneClass, spaceRuneClass, escapingQuoteRuneClass, nonEscapingQuoteRuneClass, escapeRuneClass, commentRuneClass:
 					{
@@ -360,7 +338,10 @@ SCAN:
 				case eofRuneClass:
 					{
 						err = fmt.Errorf("EOF found when expecting closing quote")
-						break SCAN
+						token := &Token{
+							tokenType: tokenType,
+							value:     string(value)}
+						return token, err
 					}
 				case charRuneClass, spaceRuneClass, nonEscapingQuoteRuneClass, commentRuneClass:
 					{
@@ -386,7 +367,10 @@ SCAN:
 				case eofRuneClass:
 					{
 						err = fmt.Errorf("EOF found when expecting closing quote")
-						break SCAN
+						token := &Token{
+							tokenType: tokenType,
+							value:     string(value)}
+						return token, err
 					}
 				case charRuneClass, spaceRuneClass, escapingQuoteRuneClass, escapeRuneClass, commentRuneClass:
 					{
@@ -402,12 +386,15 @@ SCAN:
 					}
 				}
 			}
-		case commentState:
+		case commentState: // in a comment
 			{
 				switch nextRuneType {
 				case eofRuneClass:
 					{
-						break SCAN
+						token := &Token{
+							tokenType: tokenType,
+							value:     string(value)}
+						return token, err
 					}
 				case charRuneClass, escapingQuoteRuneClass, escapeRuneClass, commentRuneClass, nonEscapingQuoteRuneClass:
 					{
@@ -417,7 +404,10 @@ SCAN:
 					{
 						if nextRune == '\n' {
 							state = startState
-							break SCAN
+							token := &Token{
+								tokenType: tokenType,
+								value:     string(value)}
+							return token, err
 						} else {
 							value = append(value, nextRune)
 						}
@@ -430,7 +420,7 @@ SCAN:
 			}
 		default:
 			{
-				panic(fmt.Sprintf("Unexpected state: %v", state))
+				return nil, fmt.Errorf("Unexpected state: %v", state)
 			}
 		}
 	}

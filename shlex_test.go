@@ -28,7 +28,7 @@ var (
 )
 
 func TestClassifier(t *testing.T) {
-	classifier := NewDefaultClassifier()
+	classifier := newDefaultClassifier()
 	tests := map[rune]runeTokenClass{
 		'a':  charRuneClass,
 		' ':  spaceRuneClass,
