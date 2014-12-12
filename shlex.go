@@ -424,10 +424,6 @@ func (t *Tokenizer) scanStream() (*Token, error) {
 			}
 		}
 	}
-	token := &Token{
-		tokenType: tokenType,
-		value:     string(value)}
-	return token, err
 }
 
 // Next returns the next token in the stream.
@@ -449,5 +445,4 @@ func Split(s string) ([]string, error) {
 		}
 		subStrings = append(subStrings, word)
 	}
-	return subStrings, nil
 }
