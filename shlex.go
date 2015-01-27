@@ -49,7 +49,7 @@ import (
 // TokenType is a top-level token classification: A word, space, comment, unknown.
 type TokenType int
 
-// runeTokenClass is the type of a UTF-8 character classification: A character, quote, space, escape.
+// runeTokenClass is the type of a UTF-8 character classification: A quote, space, escape.
 type runeTokenClass int
 
 // the internal state used by the lexer state machine
@@ -76,7 +76,6 @@ func (a *Token) Equal(b *Token) bool {
 
 // Named classes of UTF-8 runes
 const (
-	charRunes             = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-,|"
 	spaceRunes            = " \t\r\n"
 	escapingQuoteRunes    = `"`
 	nonEscapingQuoteRunes = "'"
@@ -87,7 +86,6 @@ const (
 // Classes of rune token
 const (
 	unknownRuneClass runeTokenClass = iota
-	charRuneClass
 	spaceRuneClass
 	escapingQuoteRuneClass
 	nonEscapingQuoteRuneClass
@@ -127,7 +125,6 @@ func (typeMap tokenClassifier) addRuneClass(runes string, tokenType runeTokenCla
 // newDefaultClassifier creates a new classifier for ASCII characters.
 func newDefaultClassifier() tokenClassifier {
 	t := tokenClassifier{}
-	t.addRuneClass(charRunes, charRuneClass)
 	t.addRuneClass(spaceRunes, spaceRuneClass)
 	t.addRuneClass(escapingQuoteRunes, escapingQuoteRuneClass)
 	t.addRuneClass(nonEscapingQuoteRunes, nonEscapingQuoteRuneClass)
@@ -213,12 +210,6 @@ func (t *Tokenizer) scanStream() (*Token, error) {
 					{
 						return nil, io.EOF
 					}
-				case charRuneClass:
-					{
-						tokenType = WordToken
-						value = append(value, nextRune)
-						state = inWordState
-					}
 				case spaceRuneClass:
 					{
 					}
@@ -244,7 +235,9 @@ func (t *Tokenizer) scanStream() (*Token, error) {
 					}
 				default:
 					{
-						return nil, fmt.Errorf("Uknown rune: %v", nextRune)
+						tokenType = WordToken
+						value = append(value, nextRune)
+						state = inWordState
 					}
 				}
 			}
@@ -257,10 +250,6 @@ func (t *Tokenizer) scanStream() (*Token, error) {
 							tokenType: tokenType,
 							value:     string(value)}
 						return token, err
-					}
-				case charRuneClass, commentRuneClass:
-					{
-						value = append(value, nextRune)
 					}
 				case spaceRuneClass:
 					{
@@ -284,7 +273,7 @@ func (t *Tokenizer) scanStream() (*Token, error) {
 					}
 				default:
 					{
-						return nil, fmt.Errorf("Uknown rune: %v", nextRune)
+						value = append(value, nextRune)
 					}
 				}
 			}
@@ -299,14 +288,10 @@ func (t *Tokenizer) scanStream() (*Token, error) {
 							value:     string(value)}
 						return token, err
 					}
-				case charRuneClass, spaceRuneClass, escapingQuoteRuneClass, nonEscapingQuoteRuneClass, escapeRuneClass, commentRuneClass:
+				default:
 					{
 						state = inWordState
 						value = append(value, nextRune)
-					}
-				default:
-					{
-						return nil, fmt.Errorf("Uknown rune: %v", nextRune)
 					}
 				}
 			}
@@ -321,14 +306,10 @@ func (t *Tokenizer) scanStream() (*Token, error) {
 							value:     string(value)}
 						return token, err
 					}
-				case charRuneClass, spaceRuneClass, escapingQuoteRuneClass, nonEscapingQuoteRuneClass, escapeRuneClass, commentRuneClass:
+				default:
 					{
 						state = quotingEscapingState
 						value = append(value, nextRune)
-					}
-				default:
-					{
-						return nil, fmt.Errorf("Uknown rune: %v", nextRune)
 					}
 				}
 			}
@@ -343,10 +324,6 @@ func (t *Tokenizer) scanStream() (*Token, error) {
 							value:     string(value)}
 						return token, err
 					}
-				case charRuneClass, spaceRuneClass, nonEscapingQuoteRuneClass, commentRuneClass:
-					{
-						value = append(value, nextRune)
-					}
 				case escapingQuoteRuneClass:
 					{
 						state = inWordState
@@ -357,7 +334,7 @@ func (t *Tokenizer) scanStream() (*Token, error) {
 					}
 				default:
 					{
-						return nil, fmt.Errorf("Uknown rune: %v", nextRune)
+						value = append(value, nextRune)
 					}
 				}
 			}
@@ -372,17 +349,13 @@ func (t *Tokenizer) scanStream() (*Token, error) {
 							value:     string(value)}
 						return token, err
 					}
-				case charRuneClass, spaceRuneClass, escapingQuoteRuneClass, escapeRuneClass, commentRuneClass:
-					{
-						value = append(value, nextRune)
-					}
 				case nonEscapingQuoteRuneClass:
 					{
 						state = inWordState
 					}
 				default:
 					{
-						return nil, fmt.Errorf("Uknown rune: %v", nextRune)
+						value = append(value, nextRune)
 					}
 				}
 			}
@@ -395,10 +368,6 @@ func (t *Tokenizer) scanStream() (*Token, error) {
 							tokenType: tokenType,
 							value:     string(value)}
 						return token, err
-					}
-				case charRuneClass, escapingQuoteRuneClass, escapeRuneClass, commentRuneClass, nonEscapingQuoteRuneClass:
-					{
-						value = append(value, nextRune)
 					}
 				case spaceRuneClass:
 					{
@@ -414,7 +383,7 @@ func (t *Tokenizer) scanStream() (*Token, error) {
 					}
 				default:
 					{
-						return nil, fmt.Errorf("Uknown rune: %v", nextRune)
+						value = append(value, nextRune)
 					}
 				}
 			}
