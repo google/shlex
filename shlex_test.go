@@ -94,7 +94,7 @@ func TestSplit(t *testing.T) {
 	}
 	for i := range got {
 		if got[i] != want[i] {
-			t.Errorf("Split(%q)[%v] -> %v. Want: %v", testString, got[i], want[i])
+			t.Errorf("Split(%q)[%v] -> %v. Want: %v", testString, i, got[i], want[i])
 		}
 	}
 }
