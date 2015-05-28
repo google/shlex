@@ -1,0 +1,1 @@
+A library that provides a tokenizer, for providing tokens from a reader, a lexer for providing strings, and a simple split() function for splitting a string in to multiple strings, following the quoting and commenting rules of a typical unix shell.
